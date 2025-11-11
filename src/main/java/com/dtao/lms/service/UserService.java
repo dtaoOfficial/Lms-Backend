@@ -37,16 +37,15 @@ public class UserService {
     @Autowired private EmailVerificationRepository emailVerificationRepository;
     @Autowired private PasswordEncoder passwordEncoder;
 
-    // ✅ NEW: Email notification service (injected previously)
     @Autowired private EmailNotificationService emailNotificationService;
 
     @Value("${app.mail.from}")
     private String mailFrom;
 
-    // ================== Brevo REST config & RestTemplate ==================
     private final RestTemplate restTemplate = new RestTemplate();
 
-    @Value("${brevo.api.key:}")
+    // ✅ FIXED: use uppercase env variable to match Brevo API key
+    @Value("${BREVO_API_KEY:}")
     private String brevoApiKey;
 
     @Value("${APP_MAIL_COMPANY:DTAO OFFICIAL}")
@@ -57,7 +56,6 @@ public class UserService {
 
     @Value("${APP_MAIL_WEBSITE:https://dtaoofficial.netlify.app/}")
     private String website;
-    // ===================================================================
 
     // ==============================
     // Registration + OTP
@@ -99,6 +97,7 @@ public class UserService {
 
         User saved = userRepository.save(user);
 
+        // ✅ Generate OTP and save
         String otp = generateSixDigitOtp();
         EmailVerificationToken token = new EmailVerificationToken();
         token.setEmail(saved.getEmail());
@@ -109,21 +108,14 @@ public class UserService {
         token.setSendCountLastHour(1);
         emailVerificationRepository.save(token);
 
+        // ✅ Send OTP Email
         try {
             sendVerificationOtpEmail(saved.getEmail(), saved.getName(), otp);
         } catch (Exception e) {
             System.err.println("[UserService] Failed to send OTP: " + e.getMessage());
         }
 
-        // ✅ NEW: Trigger welcome email (best-effort, non-blocking)
-        try {
-            if (emailNotificationService != null) {
-                emailNotificationService.sendWelcomeEmail(saved);
-            }
-        } catch (Exception ex) {
-            System.err.println("[UserService] Failed to send welcome email: " + ex.getMessage());
-        }
-
+        // ❌ Removed welcome email — now sent only after OTP verification
         return saved;
     }
 
@@ -131,9 +123,7 @@ public class UserService {
         return String.valueOf(100000 + new Random().nextInt(900000));
     }
 
-    /**
-     * ✅ Replaced: sendVerificationOtpEmail now uses Brevo REST API and sends HTML.
-     */
+    // ✅ Send OTP via Brevo REST API
     private void sendVerificationOtpEmail(String to, String name, String otp) {
         String subject = "Your LMS Verification Code";
         String html = """
@@ -197,6 +187,7 @@ public class UserService {
         sendVerificationOtpEmail(norm, maybeUser.get().getName(), newOtp);
     }
 
+    // ✅ FIXED: Welcome email after verification only
     public void verifyEmail(String email, String otp) {
         if (email == null || otp == null)
             throw new RuntimeException("Email and OTP required");
@@ -220,6 +211,15 @@ public class UserService {
         userRepository.save(user);
 
         emailVerificationRepository.deleteByEmail(email);
+
+        // ✅ Send welcome email AFTER verification
+        try {
+            if (emailNotificationService != null) {
+                emailNotificationService.sendWelcomeEmail(user);
+            }
+        } catch (Exception ex) {
+            System.err.println("[UserService] Failed to send post-verification welcome email: " + ex.getMessage());
+        }
     }
 
     // ==============================
@@ -242,9 +242,6 @@ public class UserService {
         userRepository.deleteById(id);
     }
 
-    // ==============================
-    // ADMIN: Update User by ID
-    // ==============================
     public Optional<User> updateUser(String id, User newData) {
         if (id == null || id.isBlank()) throw new RuntimeException("User ID is required");
 
@@ -267,9 +264,6 @@ public class UserService {
         });
     }
 
-    // ==============================
-    // Student Profile Update ✅ (includes about fix)
-    // ==============================
     public User updateStudentProfile(String email, UpdateProfileRequest req) {
         if (email == null) throw new RuntimeException("Email required");
 
@@ -296,7 +290,6 @@ public class UserService {
         if (req.getDepartment() != null && !req.getDepartment().isBlank())
             user.setDepartment(req.getDepartment().trim());
 
-        // ✅ FIXED: save 'about' field properly
         if (req.getAbout() != null)
             user.setAbout(req.getAbout().trim());
 
@@ -304,9 +297,6 @@ public class UserService {
         return userRepository.save(user);
     }
 
-    // ==============================
-    // Password Change
-    // ==============================
     public void changePassword(String email, String oldPassword, String newPassword) {
         if (email == null) throw new RuntimeException("Email required");
         if (oldPassword == null || oldPassword.isBlank())
@@ -354,7 +344,7 @@ public class UserService {
         for (int attempt = 1; attempt <= maxRetries; attempt++) {
             try {
                 sendEmailViaBrevo(to, subject, htmlContent);
-                return; // success
+                return;
             } catch (Exception ex) {
                 System.err.println("⚠️ Attempt " + attempt + " failed for " + to + ": " + ex.getMessage());
                 if (attempt < maxRetries) {
@@ -369,7 +359,7 @@ public class UserService {
     @SuppressWarnings("unchecked")
     private void sendEmailViaBrevo(String to, String subject, String htmlContent) {
         if (brevoApiKey == null || brevoApiKey.isBlank()) {
-            throw new RuntimeException("Brevo API key not configured (brevo.api.key)");
+            throw new RuntimeException("Brevo API key not configured (BREVO_API_KEY)");
         }
 
         String url = "https://api.brevo.com/v3/smtp/email";
