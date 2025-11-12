@@ -3,17 +3,22 @@ package com.dtao.lms.service;
 import com.dtao.lms.model.Exam;
 import com.dtao.lms.model.Question;
 import com.dtao.lms.repo.ExamRepository;
+import com.dtao.lms.utils.CSVParserUtil;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
-import java.io.BufferedReader;
-import java.io.InputStreamReader;
-import java.nio.charset.StandardCharsets;
-import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 
+/**
+ * ✅ ExamCSVService (Final Production Version)
+ * Handles reliable CSV uploads for exam questions.
+ * Supports:
+ * - Questions with commas, quotes, %, or semicolons
+ * - Header validation
+ * - UTF-8 BOM-safe parsing
+ * - Detailed error logs
+ */
 @Service
 public class ExamCSVService {
 
@@ -25,75 +30,43 @@ public class ExamCSVService {
     }
 
     /**
-     * Upload and parse CSV file for MCQ exams.
-     * Validates header structure and maps to Question objects.
+     * ✅ Uploads and parses a CSV, then attaches parsed questions to an existing exam.
      */
     public Exam uploadQuestionsFromCSV(String examId, MultipartFile file) {
-        Exam exam = examRepository.findById(examId)
-                .orElseThrow(() -> new RuntimeException("Exam not found with ID: " + examId));
-
-        List<Question> questions = parseCSV(file);
-        exam.setQuestions(questions);
-
-        return examRepository.save(exam);
-    }
-
-    /**
-     * Parse and validate CSV headers + content
-     */
-    private List<Question> parseCSV(MultipartFile file) {
-        List<Question> questions = new ArrayList<>();
-
-        try (BufferedReader reader = new BufferedReader(
-                new InputStreamReader(file.getInputStream(), StandardCharsets.UTF_8))) {
-
-            String line;
-            String headerLine = reader.readLine();
-
-            if (headerLine == null) {
-                throw new RuntimeException("CSV file is empty.");
-            }
-
-            List<String> headers = Arrays.asList(headerLine.split(","));
-            validateCSVHeaders(headers);
-
-            while ((line = reader.readLine()) != null) {
-                String[] data = line.split(",");
-
-                if (data.length < 7) continue; // skip invalid rows
-
-                Question question = new Question(
-                        data[0].trim(), // question
-                        data[1].trim(), // optionA
-                        data[2].trim(), // optionB
-                        data[3].trim(), // optionC
-                        data[4].trim(), // optionD
-                        data[5].trim(), // answer
-                        data[6].trim()  // explanation
-                );
-
-                questions.add(question);
-            }
-
-        } catch (Exception e) {
-            throw new RuntimeException("Failed to parse CSV file: " + e.getMessage());
+        if (file == null || file.isEmpty()) {
+            throw new RuntimeException("❌ No file uploaded. Please select a CSV file before proceeding.");
         }
 
-        return questions;
-    }
+        // ✅ Step 1: Validate Exam
+        Exam exam = examRepository.findById(examId)
+                .orElseThrow(() -> new RuntimeException("❌ Exam not found with ID: " + examId));
 
-    /**
-     * Validate the CSV header structure
-     */
-    private void validateCSVHeaders(List<String> headers) {
-        List<String> expected = Arrays.asList(
-                "Question", "OptionA", "OptionB", "OptionC", "OptionD", "Answer", "Explanation"
-        );
+        try {
+            // ✅ Step 2: Parse CSV safely
+            List<Question> questions = CSVParserUtil.parseAndValidateCSV(file);
 
-        for (int i = 0; i < expected.size(); i++) {
-            if (!headers.get(i).trim().equalsIgnoreCase(expected.get(i))) {
-                throw new RuntimeException("Invalid CSV format. Expected header: " + expected);
+            if (questions == null || questions.isEmpty()) {
+                throw new RuntimeException("⚠️ No valid questions found in the uploaded CSV file.");
             }
+
+            // ✅ Step 3: Attach to Exam and Save
+            exam.setQuestions(questions);
+            Exam savedExam = examRepository.save(exam);
+
+            System.out.println(String.format(
+                    "✅ Successfully imported %d questions into exam '%s' (ID: %s)",
+                    questions.size(),
+                    exam.getName(),
+                    exam.getId()
+            ));
+
+            return savedExam;
+
+        } catch (RuntimeException e) {
+            // Rethrow with more clarity for controller
+            throw new RuntimeException("❌ CSV upload failed: " + e.getMessage(), e);
+        } catch (Exception e) {
+            throw new RuntimeException("💥 Unexpected error while processing CSV: " + e.getMessage(), e);
         }
     }
 }

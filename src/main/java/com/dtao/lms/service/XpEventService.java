@@ -1,3 +1,4 @@
+// XpEventService.java
 package com.dtao.lms.service;
 
 import com.dtao.lms.model.XpEvent;
@@ -8,6 +9,10 @@ import org.springframework.stereotype.Service;
 
 import java.util.List;
 
+/**
+ * 🧠 XpEventService
+ * Manages XP tracking and reward events for users.
+ */
 @Service
 public class XpEventService {
 
@@ -17,6 +22,26 @@ public class XpEventService {
 
     public XpEventService(XpEventRepository xpEventRepository) {
         this.xpEventRepository = xpEventRepository;
+    }
+
+    /**
+     * ✅ Add XP for any generic event (simplified for async leaderboard updates)
+     */
+    public boolean addXp(String email, int score, String type, String message) {
+        if (email == null || email.isBlank() || score <= 0) {
+            log.warn("⚠️ Invalid XP addition request: email={}, score={}", email, score);
+            return false;
+        }
+
+        try {
+            XpEvent event = new XpEvent(email, type != null ? type : "SYSTEM", score, null, null, null, message);
+            xpEventRepository.save(event);
+            log.info("🎖 XP +{} added for {} [{}] ({})", score, email, type, message);
+            return true;
+        } catch (Exception e) {
+            log.error("💥 Error adding XP for {}: {}", email, e.getMessage());
+            return false;
+        }
     }
 
     /**

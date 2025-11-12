@@ -119,6 +119,7 @@ public class SecurityConfig {
                         .requestMatchers("/api/admin/email/**").hasRole("ADMIN")
                         .requestMatchers("/api/admin/settings/**").hasRole("ADMIN")
                         .requestMatchers("/api/admin/leaderboard/**").hasRole("ADMIN")
+                        .requestMatchers("/actuator/**").hasRole("ADMIN")
                         .requestMatchers(HttpMethod.POST, "/api/courses").hasRole("ADMIN")
                         .requestMatchers(HttpMethod.PUT, "/api/courses/**").hasRole("ADMIN")
                         .requestMatchers(HttpMethod.DELETE, "/api/courses/**").hasRole("ADMIN")

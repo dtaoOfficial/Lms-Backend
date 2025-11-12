@@ -1,3 +1,4 @@
+// StudentExamService.java
 package com.dtao.lms.service;
 
 import com.dtao.lms.dto.*;
@@ -9,6 +10,8 @@ import com.dtao.lms.repo.ExamRepository;
 import com.dtao.lms.repo.ExamResultRepository;
 import com.dtao.lms.repo.UserRepository;
 import com.dtao.lms.utils.ExamEvaluatorUtil;
+import org.springframework.scheduling.annotation.Async; // <- ADDED
+import org.springframework.beans.factory.annotation.Autowired; // <- ADDED
 import org.springframework.stereotype.Service;
 
 import java.time.Instant;
@@ -27,14 +30,18 @@ public class StudentExamService {
     private final ExamRepository examRepository;
     private final ExamResultRepository examResultRepository;
     private final UserRepository userRepository;
+    private final LeaderboardService leaderboardService; // <- ADDED
 
     // ✅ Manual constructor replacing Lombok @RequiredArgsConstructor
+    @Autowired
     public StudentExamService(ExamRepository examRepository,
                               ExamResultRepository examResultRepository,
-                              UserRepository userRepository) {
+                              UserRepository userRepository,
+                              LeaderboardService leaderboardService) { // <- UPDATED
         this.examRepository = examRepository;
         this.examResultRepository = examResultRepository;
         this.userRepository = userRepository;
+        this.leaderboardService = leaderboardService;
     }
 
     /* ============================================================
@@ -162,7 +169,7 @@ public class StudentExamService {
     }
 
     /* ============================================================
-     * 5️⃣ Submit Exam
+     * 5️⃣ Submit Exam (optimized: quick save + async evaluation)
      * ============================================================ */
     public ExamResultResponse submitExam(String examId, String studentEmail, ExamSubmitRequest request) {
         Exam exam = examRepository.findById(examId)
@@ -176,25 +183,62 @@ public class StudentExamService {
             throw new RuntimeException("Exam already submitted");
         }
 
-        ExamEvaluatorUtil.EvaluationResult eval =
-                ExamEvaluatorUtil.evaluateAnswers(exam.getQuestions(), request.getAnswers());
-
-        result.setAnswers(eval.getAnswerRecords());
-        result.setCorrectCount(eval.getCorrectCount());
-        result.setWrongCount(eval.getWrongCount());
-        result.setTotalQuestions(eval.getTotalQuestions());
-        result.setPercentage(eval.getPercentage());
-        result.setScore(eval.getCorrectCount());
-        result.setStatus("COMPLETED");
+        // ✅ Save minimal data instantly and mark as evaluating
+        result.setStatus("EVALUATING");
         result.setSubmittedAt(Instant.now());
-        result.setDurationSeconds(
-                result.getStartTime() != null
-                        ? Instant.now().getEpochSecond() - result.getStartTime().getEpochSecond()
-                        : 0
-        );
-
         examResultRepository.save(result);
-        return toResultResponse(result);
+
+        // ⚡ Fire-and-forget heavy evaluation + leaderboard update
+        evaluateAndFinalizeExamAsync(exam, result, request);
+
+        // 🧠 Immediate response for frontend
+        return ExamResultResponse.builder()
+                .examId(exam.getId())
+                .examName(exam.getName())
+                .studentEmail(studentEmail)
+                .status("PROCESSING")
+                .performanceMessage("Your submission is being evaluated. Results will appear soon.")
+                .build();
+    }
+
+    /* ============================================================
+     * 5.1 Async worker: evaluate answers, save result, update leaderboard
+     * ============================================================ */
+    @Async("taskExecutor") // runs on taskExecutor threadpool
+    public void evaluateAndFinalizeExamAsync(Exam exam, ExamResult result, ExamSubmitRequest request) {
+        try {
+            ExamEvaluatorUtil.EvaluationResult eval =
+                    ExamEvaluatorUtil.evaluateAnswers(exam.getQuestions(), request.getAnswers());
+
+            result.setAnswers(eval.getAnswerRecords());
+            result.setCorrectCount(eval.getCorrectCount());
+            result.setWrongCount(eval.getWrongCount());
+            result.setTotalQuestions(eval.getTotalQuestions());
+            result.setPercentage(eval.getPercentage());
+            result.setScore(eval.getCorrectCount());
+            result.setStatus("COMPLETED");
+            result.setDurationSeconds(
+                    result.getStartTime() != null
+                            ? Instant.now().getEpochSecond() - result.getStartTime().getEpochSecond()
+                            : 0
+            );
+            result.setSubmittedAt(Instant.now());
+
+            examResultRepository.save(result);
+
+            // 🏆 Async leaderboard update (assumes leaderboardService has this method)
+            try {
+                leaderboardService.updateLeaderboardAsync(result);
+            } catch (Exception le) {
+                // swallow leaderboard errors but log
+                System.err.println("⚠️ Leaderboard update failed for " + result.getStudentEmail() + ": " + le.getMessage());
+            }
+
+            System.out.println("✅ [Async] Exam evaluated for " + result.getStudentEmail());
+
+        } catch (Exception e) {
+            System.err.println("💥 Error evaluating exam for " + result.getStudentEmail() + ": " + e.getMessage());
+        }
     }
 
     /* ============================================================
