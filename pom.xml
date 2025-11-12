@@ -34,39 +34,39 @@
 
     <dependencies>
 
-        <!-- ✅ Email Support -->
+        <!--  Email Support -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-mail</artifactId>
         </dependency>
 
-        <!-- ✅ Jakarta Validation -->
+        <!--  Jakarta Validation -->
         <dependency>
             <groupId>jakarta.validation</groupId>
             <artifactId>jakarta.validation-api</artifactId>
             <version>3.0.2</version>
         </dependency>
 
-        <!-- ✅ PDF generation -->
+        <!--  PDF generation -->
         <dependency>
             <groupId>org.apache.pdfbox</groupId>
             <artifactId>pdfbox</artifactId>
             <version>2.0.29</version>
         </dependency>
 
-        <!-- ✅ Spring Security -->
+        <!--  Spring Security -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-security</artifactId>
         </dependency>
 
-        <!-- ✅ MongoDB -->
+        <!--  MongoDB -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-data-mongodb</artifactId>
         </dependency>
 
-        <!-- ✅ JWT Auth -->
+        <!--  JWT Auth -->
         <dependency>
             <groupId>io.jsonwebtoken</groupId>
             <artifactId>jjwt-api</artifactId>
@@ -85,44 +85,44 @@
             <scope>runtime</scope>
         </dependency>
 
-        <!-- ✅ Validation Starter -->
+        <!--  Validation Starter -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-validation</artifactId>
         </dependency>
 
-        <!-- ✅ WebSocket Support -->
+        <!--  WebSocket Support -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-websocket</artifactId>
         </dependency>
 
-        <!-- ✅ BCrypt password hashing -->
+        <!--  BCrypt password hashing -->
         <dependency>
             <groupId>org.springframework.security</groupId>
             <artifactId>spring-security-crypto</artifactId>
         </dependency>
 
-        <!-- ✅ dotenv (.env file support) -->
+        <!--  dotenv (.env file support) -->
         <dependency>
             <groupId>io.github.cdimascio</groupId>
             <artifactId>java-dotenv</artifactId>
             <version>5.2.2</version>
         </dependency>
 
-        <!-- ✅ Micrometer (Metrics Core) -->
+        <!--  Micrometer (Metrics Core) -->
         <dependency>
             <groupId>io.micrometer</groupId>
             <artifactId>micrometer-core</artifactId>
         </dependency>
 
-        <!-- ✅ Prometheus Registry (for Metrics Export) -->
+        <!--  Prometheus Registry (for Metrics Export) -->
         <dependency>
             <groupId>io.micrometer</groupId>
             <artifactId>micrometer-registry-prometheus</artifactId>
         </dependency>
 
-        <!-- ✅ Testing -->
+        <!--  Testing -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-test</artifactId>
@@ -163,7 +163,7 @@
         </dependency>
 
 
-        <!-- 🌡️ Spring Boot Actuator for monitoring -->
+        <!-- 🌡 Spring Boot Actuator for monitoring -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-actuator</artifactId>
