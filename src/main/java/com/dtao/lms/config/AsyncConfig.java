@@ -12,11 +12,10 @@ import java.util.concurrent.Executor;
 import java.util.concurrent.ThreadPoolExecutor;
 
 /**
- * ✅ AsyncConfig
+ * ✅ AsyncConfig (Render Safe)
  *
  * Enables asynchronous task execution (for mail, ranking, background jobs, etc.)
- * Safe for production: isolates heavy tasks from main web threads.
- * Adjusts automatically to your server CPU cores.
+ * Includes fallback for environments that report 0 CPU cores (like Render free tier).
  */
 @Configuration
 @EnableAsync
@@ -27,17 +26,18 @@ public class AsyncConfig implements AsyncConfigurer {
     @Bean(name = "taskExecutor")
     public Executor taskExecutor() {
         int cores = Runtime.getRuntime().availableProcessors();
+        if (cores <= 0) cores = 4; // ✅ Fallback for Render or restricted containers
 
         ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
-        executor.setCorePoolSize(Math.max(cores, 8));  // keep at least 8 threads
-        executor.setMaxPoolSize(cores * 4);            // burst capacity
-        executor.setQueueCapacity(1000);               // queue up to 1000 pending async tasks
+        executor.setCorePoolSize(Math.max(cores, 4));  // at least 4 threads
+        executor.setMaxPoolSize(Math.max(cores * 2, 8));  // burst capacity
+        executor.setQueueCapacity(1000);  // queue up to 1000 tasks
         executor.setThreadNamePrefix("AsyncExecutor-");
-        executor.setRejectedExecutionHandler(new ThreadPoolExecutor.CallerRunsPolicy()); // fallback: run in caller thread
+        executor.setRejectedExecutionHandler(new ThreadPoolExecutor.CallerRunsPolicy()); // fallback to caller thread
         executor.initialize();
 
-        log.info("✅ Async ThreadPool initialized: core={} max={} queue={}", 
-                 executor.getCorePoolSize(), executor.getMaxPoolSize(), executor.getQueueCapacity());
+        log.info("✅ Async ThreadPool initialized: core={} max={} queue={}",
+                executor.getCorePoolSize(), executor.getMaxPoolSize(), executor.getQueueCapacity());
 
         return executor;
     }
@@ -45,15 +45,16 @@ public class AsyncConfig implements AsyncConfigurer {
     @Bean(name = "mailExecutor")
     public Executor mailExecutor() {
         ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
-        executor.setCorePoolSize(10);
-        executor.setMaxPoolSize(50);
+        executor.setCorePoolSize(5);
+        executor.setMaxPoolSize(10);
         executor.setQueueCapacity(500);
         executor.setThreadNamePrefix("MailThread-");
         executor.setRejectedExecutionHandler(new ThreadPoolExecutor.CallerRunsPolicy());
         executor.initialize();
 
-        log.info("📧 Mail ThreadPool initialized: core={} max={}", 
-                 executor.getCorePoolSize(), executor.getMaxPoolSize());
+        log.info("📧 Mail ThreadPool initialized: core={} max={}",
+                executor.getCorePoolSize(), executor.getMaxPoolSize());
+
         return executor;
     }
 }
